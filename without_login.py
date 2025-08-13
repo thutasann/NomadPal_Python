@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import uuid
+import json
+import mysql.connector
 from datetime import datetime
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -9,15 +11,105 @@ from sklearn.impute import SimpleImputer
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
 
-CSV_PATH = "csv/FINALIZED_cities_data.csv"
-df = pd.read_csv(CSV_PATH)
+# Import database configuration
+try:
+    from config import DB_CONFIG_LOCAL as DB_CONFIG
+except ImportError:
+    # Fallback configuration if config.py doesn't exist
+    DB_CONFIG = {
+        'host': 'shuttle.proxy.rlwy.net',
+        'port': 19877,
+        'user': 'root',
+        'password': 'KpzlJjcyOhlHvBLmLkjnIMsFnDmzFZPM',
+        'database': 'nomadpal_db',
+        'charset': 'utf8mb4',
+        'autocommit': True
+    }
 
-if "City" not in df.columns:
-    for c in ["city","Place","place"]:
-        if c in df.columns: df.rename(columns={c:"City"}, inplace=True); break
-if "Country" not in df.columns:
-    for c in ["country"]:
-        if c in df.columns: df.rename(columns={c:"Country"}, inplace=True); break
+def load_cities_from_mysql():
+    """Load cities data from MySQL database"""
+    try:
+        # Connect to MySQL
+        connection = mysql.connector.connect(**DB_CONFIG)
+        
+        # Query to get all cities with all necessary columns
+        query = """
+        SELECT 
+            id,
+            slug,
+            name,
+            country,
+            description,
+            monthly_cost_usd,
+            avg_pay_rate_usd_hour,
+            weather_avg_temp_c,
+            safety_score,
+            nightlife_rating,
+            transport_rating,
+            housing_studio_usd_month,
+            housing_one_bed_usd_month,
+            housing_coliving_usd_month,
+            climate_avg_temp_c,
+            climate_summary,
+            internet_speed,
+            cost_pct_rent,
+            cost_pct_dining,
+            cost_pct_transport,
+            cost_pct_groceries,
+            cost_pct_coworking,
+            cost_pct_other,
+            travel_flight_from_usd,
+            travel_local_transport_usd_week,
+            travel_hotel_usd_week,
+            lifestyle_tags,
+            currency,
+            last_updated
+        FROM cities
+        """
+        
+        # Load data into pandas DataFrame
+        df = pd.read_sql(query, connection)
+        
+        # Close connection
+        connection.close()
+        
+        print(f"✅ Loaded {len(df)} cities from MySQL database")
+        return df
+        
+    except mysql.connector.Error as e:
+        print(f"❌ MySQL Error: {e}")
+        print("🔄 Falling back to sample data...")
+        return create_sample_data()
+    except Exception as e:
+        print(f"❌ Error loading from MySQL: {e}")
+        print("🔄 Falling back to sample data...")
+        return create_sample_data()
+
+def create_sample_data():
+    """Create sample data for testing when MySQL is not available"""
+    sample_data = {
+        'id': ['sample1', 'sample2', 'sample3'],
+        'name': ['Bangkok', 'Lisbon', 'Chiang Mai'],
+        'country': ['Thailand', 'Portugal', 'Thailand'],
+        'monthly_cost_usd': [1200, 1500, 800],
+        'weather_avg_temp_c': [28, 18, 25],
+        'safety_score': [75, 85, 80],
+        'internet_speed': '150 Mbps',
+        'lifestyle_tags': ['["digital-nomad"]', '["historic"]', '["mountain"]']
+    }
+    return pd.DataFrame(sample_data)
+
+# Load data from MySQL
+df = load_cities_from_mysql()
+
+# Map database column names to expected names
+# Database uses 'name' but our code expects 'City'
+if "name" in df.columns and "City" not in df.columns:
+    df.rename(columns={"name": "City"}, inplace=True)
+
+# Ensure Country column is properly named
+if "country" in df.columns and "Country" not in df.columns:
+    df.rename(columns={"country": "Country"}, inplace=True)
 
 def z(s):
     s = pd.to_numeric(s, errors="coerce")
