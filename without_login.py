@@ -112,8 +112,48 @@ def city_to_json(row):
         "last_updated": datetime.utcnow().isoformat()
     }
 
-# Top 3 cities (static, penalized)
-top3_static_rows = df.sort_values("predicted_score", ascending=False).head(3)
-top3_static_json = [city_to_json(r) for _, r in top3_static_rows.iterrows()]
+def get_top_cities(limit=3):
+    """Get top N cities from the trained model"""
+    top_rows = df.sort_values("predicted_score", ascending=False).head(limit)
+    return [city_to_json(r) for _, r in top_rows.iterrows()]
 
-print(json.dumps(top3_static_json, indent=4))
+def get_all_cities():
+    """Get all cities with predictions"""
+    return [city_to_json(r) for _, r in df.iterrows()]
+
+def search_cities(query, limit=10):
+    """Search cities by name or country"""
+    filtered_df = df[
+        df["City"].str.lower().str.contains(query.lower(), na=False) |
+        df["Country"].str.lower().str.contains(query.lower(), na=False)
+    ].sort_values("predicted_score", ascending=False).head(limit)
+    return [city_to_json(r) for _, r in filtered_df.iterrows()]
+
+def get_cities_by_country(country, limit=10):
+    """Get cities filtered by specific country"""
+    filtered_df = df[
+        df["Country"].str.lower().str.contains(country.lower(), na=False)
+    ].sort_values("predicted_score", ascending=False).head(limit)
+    return [city_to_json(r) for _, r in filtered_df.iterrows()]
+
+def get_countries():
+    """Get list of all available countries"""
+    countries = df["Country"].dropna().unique().tolist()
+    countries = [c for c in countries if c.lower() not in ["unknown", "unknown country", "n/a", "na"]]
+    return sorted(countries)
+
+def get_stats():
+    """Get basic statistics about the dataset"""
+    return {
+        "total_cities": len(df),
+        "total_countries": len(df["Country"].dropna().unique()),
+        "avg_monthly_cost": round(df["monthly_cost_usd"].mean(), 2) if "monthly_cost_usd" in df else None,
+        "avg_safety_score": round(df["safety_score"].mean(), 2) if "safety_score" in df else None,
+        "avg_temperature": round(df["weather_avg_temp_c"].mean(), 2) if "weather_avg_temp_c" in df else None,
+    }
+
+# Only run if executed directly
+if __name__ == "__main__":
+    # Top 3 cities (static, penalized)
+    top3_static_json = get_top_cities(3)
+    print(json.dumps(top3_static_json, indent=4))
