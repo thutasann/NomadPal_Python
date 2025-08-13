@@ -9,7 +9,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
 
-CSV_PATH = "../csv/FINALIZED_cities_data.csv"
+CSV_PATH = "csv/FINALIZED_cities_data.csv"
 df = pd.read_csv(CSV_PATH)
 
 if "City" not in df.columns:
