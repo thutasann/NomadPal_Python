@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+**/__pycache__
+**/*.py[cod]
+**/*$py.class
+**/.env
+**/.venv
+**/env
+**/venv
+**/ENV
+
+# Flask
+**/instance
+**/*.db
+**/*.sqlite3
+
+# Pip environment
+**/*.log
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+
+# PyInstaller
+**/dist
+**/build
+**/*.spec
+
+# Jupyter
+**/.ipynb_checkpoints
+
+# OS Files
+**/.DS_Store
+**/Thumbs.db
+
+# VS Code
+**/.vscode
+
+# Git
+**/.git
+**/.gitignore
+
+# Virtual environments
+**/venv
+**/__pycache__
+**/*.pyc
+
+# Large dependencies
+**/*.so
+**/*.dylib
+**/*.dll
+**/*.exe
+
+# Development files
+**/README.md
+**/test_*.py
+**/test_*.sh
+**/.pytest_cache
+
+# CSV data (since we're using MySQL now)
+**/csv/

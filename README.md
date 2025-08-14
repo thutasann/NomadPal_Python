@@ -319,6 +319,75 @@ ls csv/FINALIZED_cities_data.csv
 | 400 | Bad Request (missing parameters) |
 | 500 | Internal Server Error (model issues) |
 
+## 🚀 Deployment to Fly.io
+
+### Prerequisites
+1. Install [flyctl](https://fly.io/docs/getting-started/installing-flyctl/)
+2. Sign up for [Fly.io account](https://fly.io/app/sign-up)
+3. Authenticate: `flyctl auth login`
+
+### Manual Deployment
+
+1. **Initialize the Fly app:**
+```bash
+flyctl launch --no-deploy
+```
+
+2. **Set database secrets (update with your MySQL credentials):**
+```bash
+flyctl secrets set DB_HOST="your-mysql-host"
+flyctl secrets set DB_PORT="3306"
+flyctl secrets set DB_USER="your-username"
+flyctl secrets set DB_PASSWORD="your-password"
+flyctl secrets set DB_NAME="nomadpal_db"
+```
+
+3. **Deploy the application:**
+```bash
+flyctl deploy
+```
+
+4. **Check the deployment:**
+```bash
+flyctl status
+flyctl logs
+```
+
+### Automatic Deployment with GitHub Actions
+
+1. **Set up GitHub repository secrets:**
+   - Go to your GitHub repository settings
+   - Add secret: `FLY_API_TOKEN` (get from `flyctl auth token`)
+
+2. **Push to main branch:**
+```bash
+git add .
+git commit -m "Deploy NomadPal Model Service"
+git push origin main
+```
+
+3. **Monitor deployment:**
+   - Check GitHub Actions tab for deployment status
+   - Visit: `https://nomadpal-model.fly.dev/health`
+
+### Production Configuration
+
+The `fly.toml` file is configured for:
+- **Region**: Singapore (sin) - change as needed
+- **Memory**: 1GB - adjust based on data size
+- **Auto-scaling**: Stops when idle, starts on demand
+- **HTTPS**: Force HTTPS enabled
+
+### API Endpoints (Live)
+
+Once deployed, your API will be available at:
+```
+https://nomadpal-model.fly.dev/health
+https://nomadpal-model.fly.dev/cities/top?limit=10
+https://nomadpal-model.fly.dev/cities/search?q=thailand
+https://nomadpal-model.fly.dev/countries
+```
+
 ## 🔮 Future Enhancements
 
 - [ ] User preference-based scoring
@@ -331,4 +400,4 @@ ls csv/FINALIZED_cities_data.csv
 
 ---
 
-**Note:** This service is designed for development and testing. For production deployment, consider adding authentication, rate limiting, and proper logging.
+**Note:** This service is now production-ready with MySQL integration and Fly.io deployment!
