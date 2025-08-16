@@ -304,7 +304,10 @@ def get_personalized_cities_with_user_preferences(
         has_next_page = end_idx < total_count
         has_prev_page = offset > 0
         
-        return {
+        print(f"🔢 Pagination calculation: total={total_count}, limit={limit}, offset={offset}")
+        print(f"🔢 Calculated: current_page={current_page}, total_pages={total_pages}, has_next_page={has_next_page}")
+        
+        result = {
             "success": True,
             "cities": cities,
             "total": total_count,
@@ -321,6 +324,9 @@ def get_personalized_cities_with_user_preferences(
                 "lifestyle_priorities": lifestyle_priorities
             }
         }
+        
+        print(f"✅ Python ML returning: {len(cities)} cities, page {current_page}/{total_pages}")
+        return result
         
     except Exception as e:
         print(f"Error in get_personalized_cities_with_user_preferences: {str(e)}")
