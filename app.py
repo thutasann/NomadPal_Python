@@ -116,7 +116,7 @@ def get_personalized_cities_route():
             return jsonify({"error": "User preferences are required"}), 400
         
         # Get pagination parameters
-        limit = min(int(request.args.get('limit', 20)), 100)  # Increased max limit
+        limit = min(int(request.args.get('limit', 20)), 200)  # Increased max limit to 200
         page = max(int(request.args.get('page', 1)), 1)
         offset = (page - 1) * limit
         
@@ -136,7 +136,16 @@ def get_personalized_cities_route():
                 "data": result["cities"],
                 "total": result["total"],
                 "limit": limit,
-                "user_preferences": result["user_preferences"]
+                "user_preferences": result["user_preferences"],
+                "pagination": {
+                    "total": result["total"],
+                    "limit": result["limit"],
+                    "offset": result["offset"],
+                    "has_next_page": result["has_next_page"],
+                    "has_prev_page": result["has_prev_page"],
+                    "current_page": result["current_page"],
+                    "total_pages": result["total_pages"]
+                }
             })
         else:
             return jsonify({"error": result["error"]}), 500

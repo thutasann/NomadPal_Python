@@ -1,5 +1,6 @@
 import json
 import uuid
+import math
 from datetime import datetime
 from typing import Dict, Optional
 import numpy as np
@@ -221,22 +222,35 @@ def get_personalized_cities_with_user_preferences(
         
         preferred_temp = climate_temp_map.get(preferred_climate.lower(), 22.0)
         
-        # Build constraints based on user preferences
+        # Build constraints based on user preferences (make them less restrictive)
         constraints = {}
-        if budget_max > 0:
-            constraints['max_monthly_cost_usd'] = budget_max
+        if budget_max > 0 and budget_max < 5000:  # Only apply budget constraint if it's reasonable
+            constraints['max_monthly_cost_usd'] = budget_max * 1.5  # Allow 50% buffer
         if budget_min > 0:
-            constraints['min_monthly_cost_usd'] = budget_min
+            constraints['min_monthly_cost_usd'] = budget_min * 0.8  # Allow 20% buffer
         
-        # Add climate constraints
-        constraints['temp_band'] = 8.0  # ±8°C tolerance
+        # Make climate constraints less restrictive
+        constraints['temp_band'] = 15.0  # ±15°C tolerance (much more permissive)
         
         # Get personalized rankings (get all cities first for proper pagination)
+        # Use a much larger limit to ensure we get all cities
         ranked = rank_cities_personalized(
             weights={"budget": budget_weight, "climate": climate_weight},
             preferred_temp_c=preferred_temp,
-            constraints=constraints
+            constraints=constraints,
+            top_k=10000  # Get all cities from database
         )
+        
+        # If we got too few cities due to strict constraints, try without constraints
+        if len(ranked) < 100:  # If we have less than 100 cities, constraints are too strict
+            print(f"Warning: Only got {len(ranked)} cities with constraints, trying without constraints")
+            ranked = rank_cities_personalized(
+                weights={"budget": budget_weight, "climate": climate_weight},
+                preferred_temp_c=preferred_temp,
+                constraints={},  # No constraints
+                top_k=10000
+            )
+            print(f"Now got {len(ranked)} cities without constraints")
         
         # Apply additional lifestyle-based filtering if priorities exist
         if lifestyle_priorities and len(lifestyle_priorities) > 0:
@@ -284,16 +298,22 @@ def get_personalized_cities_with_user_preferences(
         # Convert to JSON
         cities = [row_to_city_json(row) for _, row in paginated_ranked.iterrows()]
         
+        # Calculate pagination metadata correctly
+        total_pages = math.ceil(total_count / limit)
+        current_page = (offset // limit) + 1
+        has_next_page = end_idx < total_count
+        has_prev_page = offset > 0
+        
         return {
             "success": True,
             "cities": cities,
             "total": total_count,
             "limit": limit,
             "offset": offset,
-            "has_next_page": end_idx < total_count,
-            "has_prev_page": offset > 0,
-            "current_page": (offset // limit) + 1,
-            "total_pages": (total_count + limit - 1) // limit,
+            "has_next_page": has_next_page,
+            "has_prev_page": has_prev_page,
+            "current_page": current_page,
+            "total_pages": total_pages,
             "user_preferences": {
                 "budget_range": f"${budget_min}-${budget_max}",
                 "preferred_climate": preferred_climate,
