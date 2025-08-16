@@ -105,6 +105,46 @@ def get_stats_route():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/cities/personalized', methods=['POST'])
+def get_personalized_cities_route():
+    """Get personalized city recommendations based on user preferences"""
+    try:
+        # Get user preferences from request body
+        user_preferences = request.get_json()
+        
+        if not user_preferences:
+            return jsonify({"error": "User preferences are required"}), 400
+        
+        # Get pagination parameters
+        limit = min(int(request.args.get('limit', 20)), 100)  # Increased max limit
+        page = max(int(request.args.get('page', 1)), 1)
+        offset = (page - 1) * limit
+        
+        # Import the personalized function
+        from with_login import get_personalized_cities_with_user_preferences
+        
+        # Get personalized recommendations
+        result = get_personalized_cities_with_user_preferences(
+            user_preferences=user_preferences,
+            limit=limit,
+            offset=offset
+        )
+        
+        if result["success"]:
+            return jsonify({
+                "status": "success",
+                "data": result["cities"],
+                "total": result["total"],
+                "limit": limit,
+                "user_preferences": result["user_preferences"]
+            })
+        else:
+            return jsonify({"error": result["error"]}), 500
+            
+    except Exception as e:
+        print(f"❌ Error in get_personalized_cities_route: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     # Model is automatically loaded when we import without_login!
     print("🚀 Starting NomadPal API using without_login.py")

@@ -168,6 +168,148 @@ def get_personalized_cities(
     
     return [row_to_city_json(row) for _, row in ranked.iterrows()]
 
+def get_personalized_cities_with_user_preferences(
+    user_preferences: Dict,
+    limit: int = 20,
+    offset: int = 0
+):
+    """
+    Get personalized city recommendations based on user preferences from database
+    
+    Args:
+        user_preferences: Dict containing user preference data:
+            - monthly_budget_min_usd: float
+            - monthly_budget_max_usd: float
+            - preferred_climate: str
+            - timezone: str
+            - lifestyle_priorities: list
+            - monthly_budget_min_usd: float
+            - monthly_budget_max_usd: float
+        limit: Maximum number of cities to return
+        offset: Number of cities to skip (for pagination)
+    
+    Returns:
+        List of ranked cities with personalized scores
+    """
+    try:
+        # Extract user preferences
+        budget_min = float(user_preferences.get('monthly_budget_min_usd', 0))
+        budget_max = float(user_preferences.get('monthly_budget_max_usd', 10000))
+        preferred_climate = user_preferences.get('preferred_climate', 'moderate')
+        timezone = user_preferences.get('timezone', 'UTC')
+        lifestyle_priorities = user_preferences.get('lifestyle_priorities', [])
+        
+        # Calculate budget weight based on user's budget range
+        if budget_max > 0:
+            budget_weight = 0.7  # Higher weight for budget-conscious users
+            climate_weight = 0.3
+        else:
+            budget_weight = 0.5
+            climate_weight = 0.5
+        
+        # Map climate preferences to temperature ranges
+        climate_temp_map = {
+            'tropical': 28.0,
+            'subtropical': 25.0,
+            'temperate': 20.0,
+            'moderate': 22.0,
+            'continental': 18.0,
+            'polar': 5.0,
+            'arid': 30.0,
+            'mediterranean': 24.0
+        }
+        
+        preferred_temp = climate_temp_map.get(preferred_climate.lower(), 22.0)
+        
+        # Build constraints based on user preferences
+        constraints = {}
+        if budget_max > 0:
+            constraints['max_monthly_cost_usd'] = budget_max
+        if budget_min > 0:
+            constraints['min_monthly_cost_usd'] = budget_min
+        
+        # Add climate constraints
+        constraints['temp_band'] = 8.0  # ±8°C tolerance
+        
+        # Get personalized rankings (get all cities first for proper pagination)
+        ranked = rank_cities_personalized(
+            weights={"budget": budget_weight, "climate": climate_weight},
+            preferred_temp_c=preferred_temp,
+            constraints=constraints
+        )
+        
+        # Apply additional lifestyle-based filtering if priorities exist
+        if lifestyle_priorities and len(lifestyle_priorities) > 0:
+            # Filter cities based on lifestyle priorities
+            lifestyle_priority_map = {
+                'nightlife': 'nightlife_rating',
+                'safety': 'safety_score',
+                'transport': 'transport_rating',
+                'internet': 'internet_speed',
+                'cost': 'monthly_cost_usd'
+            }
+            
+            # Apply lifestyle scoring
+            for _, row in ranked.iterrows():
+                lifestyle_score = 0
+                for priority in lifestyle_priorities:
+                    if priority.lower() in lifestyle_priority_map:
+                        col_name = lifestyle_priority_map[priority.lower()]
+                        if col_name in row and pd.notna(row[col_name]):
+                            try:
+                                value = float(row[col_name])
+                                if col_name == 'monthly_cost_usd':
+                                    # Lower cost = higher score
+                                    lifestyle_score += (10000 - value) / 100
+                                else:
+                                    # Higher rating = higher score
+                                    lifestyle_score += value
+                            except (ValueError, TypeError):
+                                pass
+                
+                # Add lifestyle score to user score
+                row['_user_score'] += lifestyle_score * 0.1
+            
+            # Re-sort by updated score
+            ranked = ranked.sort_values('_user_score', ascending=False).reset_index(drop=True)
+        
+        # Get total count before pagination
+        total_count = len(ranked)
+        
+        # Apply pagination
+        start_idx = offset
+        end_idx = start_idx + limit
+        paginated_ranked = ranked.iloc[start_idx:end_idx]
+        
+        # Convert to JSON
+        cities = [row_to_city_json(row) for _, row in paginated_ranked.iterrows()]
+        
+        return {
+            "success": True,
+            "cities": cities,
+            "total": total_count,
+            "limit": limit,
+            "offset": offset,
+            "has_next_page": end_idx < total_count,
+            "has_prev_page": offset > 0,
+            "current_page": (offset // limit) + 1,
+            "total_pages": (total_count + limit - 1) // limit,
+            "user_preferences": {
+                "budget_range": f"${budget_min}-${budget_max}",
+                "preferred_climate": preferred_climate,
+                "preferred_temperature": f"{preferred_temp}°C",
+                "lifestyle_priorities": lifestyle_priorities
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error in get_personalized_cities_with_user_preferences: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "cities": []
+        }
+
 def search_personalized_cities(
     query: str,
     weights: Dict[str, float] = None,
