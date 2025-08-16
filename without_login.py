@@ -149,17 +149,20 @@ model.fit(X_tr, y_tr)
 # ---- Predict & format JSON
 df["predicted_score"] = model.predict(X)
 # Penalize cities with unknown/missing country
+# Use database column names (country) if available, fallback to CSV names (Country)
+country_col = "country" if "country" in df.columns else "Country"
+
 unknown_mask = (
-    df["Country"].isna()
-    | df["Country"].astype(str).str.strip().eq("")
-    | df["Country"].astype(str).str.contains(r"^unknown\b", case=False, na=True)
+    df[country_col].isna()
+    | df[country_col].astype(str).str.strip().eq("")
+    | df[country_col].astype(str).str.contains(r"^unknown\b", case=False, na=True)
 )
 
 UNKNOWN_TOKENS = {"unknown country", "unknown", "n/a", "na", "none", "null", ""}
 mask_unknown = (
-    df["Country"].isna()
-    | df["Country"].astype(str).str.strip().str.lower().isin(UNKNOWN_TOKENS)
-    | df["Country"].astype(str).str.contains(r"^\s*unknown", case=False, na=True)
+    df[country_col].isna()
+    | df[country_col].astype(str).str.strip().str.lower().isin(UNKNOWN_TOKENS)
+    | df[country_col].astype(str).str.contains(r"^\s*unknown", case=False, na=True)
 )
 
 # Apply very large negative penalty so they sink
@@ -173,10 +176,10 @@ from datetime import datetime
 
 def city_to_json(row):
     return {
-        "id": uuid.uuid4().hex,
-        "slug": str(row["City"]).strip().lower().replace(" ", "-") if "City" in row else None,
-        "name": row.get("City"),
-        "country": row.get("Country", "Unknown Country"),
+        "id": row.get("id"),  # Use the actual database ID
+        "slug": row.get("slug"),  # Use the actual database slug
+        "name": row.get("name") or row.get("City"),  # Prefer 'name' column, fallback to 'City'
+        "country": row.get("country") or row.get("Country", "Unknown Country"),
         "description": row.get("description"),
         "monthly_cost_usd": str(round(row.get("monthly_cost_usd", 0), 2)) if "monthly_cost_usd" in row else None,
         "avg_pay_rate_usd_hour": str(round(row.get("avg_pay_rate_usd_hour", 0), 2)) if "avg_pay_rate_usd_hour" in row else None,
@@ -201,7 +204,9 @@ def city_to_json(row):
         "travel_hotel_usd_week": str(row.get("travel_hotel_usd_week")) if "travel_hotel_usd_week" in row else None,
         "lifestyle_tags": row.get("lifestyle_tags", []),
         "currency": row.get("currency", "USD"),
-        "last_updated": datetime.utcnow().isoformat()
+        "last_updated": datetime.utcnow().isoformat(),
+        "predicted_score": float(row.get("predicted_score", 0)),
+        "ml_enhanced": True
     }
 
 def get_top_cities(limit=3):
@@ -215,22 +220,32 @@ def get_all_cities():
 
 def search_cities(query, limit=10):
     """Search cities by name or country"""
+    # Use database column names (name, country) if available, fallback to CSV names (City, Country)
+    name_col = "name" if "name" in df.columns else "City"
+    country_col = "country" if "country" in df.columns else "Country"
+    
     filtered_df = df[
-        df["City"].str.lower().str.contains(query.lower(), na=False) |
-        df["Country"].str.lower().str.contains(query.lower(), na=False)
+        df[name_col].str.lower().str.contains(query.lower(), na=False) |
+        df[country_col].str.lower().str.contains(query.lower(), na=False)
     ].sort_values("predicted_score", ascending=False).head(limit)
     return [city_to_json(r) for _, r in filtered_df.iterrows()]
 
 def get_cities_by_country(country, limit=10):
     """Get cities filtered by specific country"""
+    # Use database column names (country) if available, fallback to CSV names (Country)
+    country_col = "country" if "country" in df.columns else "Country"
+    
     filtered_df = df[
-        df["Country"].str.lower().str.contains(country.lower(), na=False)
+        df[country_col].str.lower().str.contains(country.lower(), na=False)
     ].sort_values("predicted_score", ascending=False).head(limit)
     return [city_to_json(r) for _, r in filtered_df.iterrows()]
 
 def get_countries():
     """Get list of all available countries"""
-    countries = df["Country"].dropna().unique().tolist()
+    # Use database column names (country) if available, fallback to CSV names (Country)
+    country_col = "country" if "country" in df.columns else "Country"
+    
+    countries = df[country_col].dropna().unique().tolist()
     countries = [c for c in countries if c.lower() not in ["unknown", "unknown country", "n/a", "na"]]
     return sorted(countries)
 

@@ -69,10 +69,10 @@ def penalize_unknown_countries(work: pd.DataFrame, score_col: str, penalty: floa
 def row_to_city_json(row: pd.Series) -> dict:
     """Convert a DataFrame row to the full structured city JSON - same format as without_login.py"""
     return {
-        "id": uuid.uuid4().hex,
-        "slug": str(row.get("City", "")).strip().lower().replace(" ", "-") if "City" in row else None,
-        "name": row.get("City"),
-        "country": row.get("Country", "Unknown Country"),
+        "id": row.get("id"),  # Use the actual database ID
+        "slug": row.get("slug"),  # Use the actual database slug
+        "name": row.get("name") or row.get("City"),  # Prefer 'name' column, fallback to 'City'
+        "country": row.get("country") or row.get("Country", "Unknown Country"),
         "description": row.get("description"),
         "monthly_cost_usd": str(round(row.get("monthly_cost_usd", 0), 2)) if "monthly_cost_usd" in row else None,
         "avg_pay_rate_usd_hour": str(round(row.get("avg_pay_rate_usd_hour", 0), 2)) if "avg_pay_rate_usd_hour" in row else None,
@@ -97,7 +97,8 @@ def row_to_city_json(row: pd.Series) -> dict:
         "travel_hotel_usd_week": str(row.get("travel_hotel_usd_week")) if "travel_hotel_usd_week" in row else None,
         "lifestyle_tags": row.get("lifestyle_tags", []),
         "currency": row.get("currency", "USD"),
-        "predicted_score": row.get("_user_score", 0),  # Use personalized score
+        "predicted_score": float(row.get("_user_score", 0)),  # Use personalized score
+        "ml_enhanced": True,
         "last_updated": datetime.utcnow().isoformat()
     }
 

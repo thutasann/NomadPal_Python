@@ -25,6 +25,12 @@ def get_top_cities():
         limit = min(int(request.args.get('limit', 10)), 50)
         cities = without_login.get_top_cities(limit)
         
+        # Debug: Print first city to verify ID format
+        if cities:
+            print(f"🔍 Sample city ID: {cities[0].get('id')} (type: {type(cities[0].get('id'))})")
+            print(f"🔍 Sample city name: {cities[0].get('name')}")
+            print(f"🔍 Sample city slug: {cities[0].get('slug')}")
+        
         return jsonify({
             "status": "success",
             "data": cities,
@@ -32,6 +38,7 @@ def get_top_cities():
             "limit": limit
         })
     except Exception as e:
+        print(f"❌ Error in get_top_cities: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/cities/search', methods=['GET'])
